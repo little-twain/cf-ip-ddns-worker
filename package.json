@@ -1,0 +1,35 @@
+{
+    "name": "cf-ip-ddns-worker",
+    "version": "1.0.0",
+    "description": "Simple Cloudflare Worker to return visitor IP and optionally update A record via Cloudflare API",
+    "main": "src/index.ts",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "deploy:staging": "wrangler deploy --env staging",
+        "tail": "wrangler tail",
+        "type-check": "tsc --noEmit"
+    },
+    "keywords": [
+        "cloudflare",
+        "worker",
+        "ddns",
+        "ip",
+        "dns"
+    ],
+    "author": "little-twain",
+    "license": "GPL-3.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/little-twain/cf-ip-ddns-worker.git"
+    },
+    "bugs": {
+        "url": "https://github.com/little-twain/cf-ip-ddns-worker/issues"
+    },
+    "homepage": "https://github.com/little-twain/cf-ip-ddns-worker#readme",
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250718.0",
+        "typescript": "^5.8.3",
+        "wrangler": "^3.0.0"
+    }
+}

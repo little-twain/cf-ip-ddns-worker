@@ -1,0 +1,9 @@
+name = "cf-ip-ddns-worker"
+main = "src/index.ts"
+compatibility_date = "2023-10-30"
+
+[env.production]
+name = "cf-ip-ddns-worker"
+
+[env.staging]
+name = "cf-ip-ddns-worker-staging"
