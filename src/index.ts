@@ -270,11 +270,10 @@ export default {
 
             // 如果 IP 没有变化，不需要更新
             if (currentIP === clientIP) {
-                return createSuccessResponse(
-                    "IP unchanged, no update needed",
-                    clientIP,
-                    ddnsParams.name
-                );
+                return new Response("", {
+                    status: 200,
+                    headers: { "Content-Type": "text/plain" }
+                });
             }
 
             // 2) PUT 更新 IP
@@ -291,13 +290,11 @@ export default {
                 return updateResult.error;
             }
 
-            return createSuccessResponse(
-                "DNS record updated successfully",
-                clientIP,
-                ddnsParams.name,
-                currentIP,
-                record.id
-            );
+            // 成功更新，返回空响应
+            return new Response("", {
+                status: 200,
+                headers: { "Content-Type": "text/plain" }
+            });
         }
 
         // 否则，返回访问者 IP
