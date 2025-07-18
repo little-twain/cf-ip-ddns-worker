@@ -192,10 +192,9 @@ async function updateDNSRecord(
                 },
                 body: JSON.stringify({
                     type: "A",
-                    name: recordName,
+                    name: recordName,  // 使用完整域名，不需要额外处理
                     content: newIP,
-                    ttl: 120,
-                    proxied: false,
+                    ttl: 1  // 使用 1 (自动) 而不是 120，与 Cloudflare 默认行为一致
                 }),
             }
         );
