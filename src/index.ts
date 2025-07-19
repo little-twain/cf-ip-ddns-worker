@@ -4,8 +4,9 @@ import type { ExecutionContext } from '@cloudflare/workers-types';
  * Cloudflare Worker for IP detection and DDNS updates
  *
  * Usage:
- * 1. GET /<any-path> - Returns visitor's IP address
- * 2. GET /?zone=ZONE_ID&email=EMAIL&key=API_KEY&name=RECORD_NAME - Updates DNS A record
+ * 1. GET /<any-path> - Returns visitor's IP address (IPv4 or IPv6)
+ * 2. GET /?zone=ZONE_ID&email=EMAIL&key=API_KEY&name=RECORD_NAME - Updates DNS record
+ *    - Automatically detects IP type and updates A record (IPv4) or AAAA record (IPv6)
  */
 
 interface DDNSParams {
@@ -115,15 +116,32 @@ function validateDDNSParams(params: URLSearchParams): DDNSParams | null {
     return { zone, email, key, name };
 }
 
+function getIPType(ip: string): "A" | "AAAA" | null {
+    // IPv4 pattern: xxx.xxx.xxx.xxx
+    const ipv4Pattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    
+    // IPv6 pattern: simplified check for colon-separated hex groups
+    const ipv6Pattern = /^(?:[0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}$|^::1$|^::$/;
+    
+    if (ipv4Pattern.test(ip)) {
+        return "A";
+    } else if (ipv6Pattern.test(ip)) {
+        return "AAAA";
+    }
+    
+    return null;
+}
+
 async function getDNSRecord(
     zoneId: string,
     recordName: string,
+    recordType: "A" | "AAAA",
     authEmail: string,
     authKey: string
 ): Promise<{ record: any; response: Response } | { error: Response }> {
     try {
         const listRes = await fetch(
-            `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?type=A&name=${encodeURIComponent(recordName)}`,
+            `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?type=${recordType}&name=${encodeURIComponent(recordName)}`,
             {
                 method: "GET",
                 headers: {
@@ -153,7 +171,7 @@ async function getDNSRecord(
             return {
                 error: createErrorResponse(
                     "record_not_found",
-                    `DNS A record '${recordName}' not found in zone`,
+                    `DNS ${recordType} record '${recordName}' not found in zone`,
                     404,
                     listJson.errors || listJson
                 ),
@@ -176,6 +194,7 @@ async function updateDNSRecord(
     zoneId: string,
     recordId: string,
     recordName: string,
+    recordType: "A" | "AAAA",
     newIP: string,
     authEmail: string,
     authKey: string
@@ -191,7 +210,7 @@ async function updateDNSRecord(
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    type: "A",
+                    type: recordType,
                     name: recordName,  // 使用完整域名，不需要额外处理
                     content: newIP,
                     ttl: 1  // 使用 1 (自动) 而不是 120，与 Cloudflare 默认行为一致
@@ -253,10 +272,21 @@ export default {
                 );
             }
 
+            // 检测当前 IP 类型
+            const ipType = getIPType(clientIP);
+            if (!ipType) {
+                return createErrorResponse(
+                    "invalid_ip",
+                    `Invalid IP address format: ${clientIP}`,
+                    400
+                );
+            }
+
             // 1) 先 GET 看看有没有这个记录
             const dnsResult = await getDNSRecord(
                 ddnsParams.zone,
                 ddnsParams.name,
+                ipType,
                 ddnsParams.email,
                 ddnsParams.key
             );
@@ -281,6 +311,7 @@ export default {
                 ddnsParams.zone,
                 record.id,
                 ddnsParams.name,
+                ipType,
                 clientIP,
                 ddnsParams.email,
                 ddnsParams.key
