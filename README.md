@@ -1,16 +1,17 @@
 # cf-ip-ddns-worker
 
-🌐 简单的 Cloudflare Worker，用于返回访问者 IP 地址并可选择性地通过 Cloudflare API 更新 DNS A 记录。
+🌐 简单的 Cloudflare Worker，用于返回访问者 IP 地址并可选择性地通过 Cloudflare API 更新 DNS 记录。
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/little-twain/cf-ip-ddns-worker)
 
 ## 功能特性
 
-- 🌐 **IP 检测**：访问任意路径返回客户端真实 IP 地址
-- 🔄 **DDNS 更新**：通过 URL 参数自动更新 DNS 记录
+- 🌐 **IP 检测**：访问任意路径返回客户端真实 IP 地址（支持 IPv4 和 IPv6）
+- 🔄 **DDNS 更新**：通过 URL 参数自动更新 DNS 记录（A 记录用于 IPv4，AAAA 记录用于 IPv6）
 - ⚡ **快速响应**：基于 Cloudflare Workers 的边缘计算
 - 🛡️ **错误处理**：完善的错误处理和状态返回
 - 📘 **TypeScript**：完整的类型定义，提供更好的开发体验
+- 🤖 **智能记录类型**：根据 IP 地址类型自动选择 A 记录或 AAAA 记录
 
 ## 快速部署
 
@@ -45,13 +46,18 @@ npm run deploy
 
 ```bash
 curl https://your-worker.your-subdomain.workers.dev/
-# 返回: 192.168.1.100
+# 返回: 192.168.1.100 (IPv4)
+# 或: 2001:db8::1 (IPv6)
 ```
 
 ### 手动更新 DNS 记录
 
 ```bash
+# IPv4 用户访问时，自动更新 A 记录
 curl "https://your-worker.your-subdomain.workers.dev/?zone=ZONE_ID&email=YOUR_EMAIL&key=YOUR_API_KEY&name=subdomain.example.com"
+
+# IPv6 用户访问时，自动更新 AAAA 记录
+# Worker 会根据检测到的 IP 类型自动选择记录类型
 ```
 
 ### 自动化脚本示例
@@ -70,6 +76,14 @@ RECORD_NAME="home.example.com"
 
 # 调用 API 更新 DNS
 curl -s "$WORKER_URL/?zone=$ZONE_ID&email=$AUTH_EMAIL&key=$AUTH_KEY&name=$RECORD_NAME"
+
+# 检查更新结果（可选）
+RESPONSE=$(curl -s "$WORKER_URL/?zone=$ZONE_ID&email=$AUTH_EMAIL&key=$AUTH_KEY&name=$RECORD_NAME")
+if [ $? -eq 0 ]; then
+    echo "$(date): DNS update successful"
+else
+    echo "$(date): DNS update failed"
+fi
 ```
 
 ### 定时任务设置
@@ -89,39 +103,34 @@ crontab -e
 - `key`: Cloudflare Global API Key
 - `name`: 要更新的 DNS 记录名称（如 `home.example.com`）
 
-#### 响应示例
+#### 响应行为
 
-**成功更新：**
+**成功更新或IP未变化：**
 
-```json
-{
-  "success": true,
-  "message": "DNS record updated successfully",
-  "ip": "192.168.1.100",
-  "previous_ip": "192.168.1.99",
-  "record_name": "home.example.com",
-  "record_id": "abc123def456"
-}
-```
+- HTTP 状态码：200
+- 响应体：空（无内容）
+- 适合在自动化脚本中使用，减少日志噪音
 
-**IP 未变化：**
+**错误情况：**
 
-```json
-{
-  "success": true,
-  "message": "IP unchanged, no update needed",
-  "ip": "192.168.1.100",
-  "record_name": "home.example.com"
-}
-```
-
-**记录不存在：**
+- HTTP 状态码：400/404/500等
+- 响应体：JSON格式的错误信息
 
 ```json
 {
   "success": false,
   "error": "record_not_found",
   "message": "DNS A record 'home.example.com' not found in zone"
+}
+```
+
+**IP地址格式无效：**
+
+```json
+{
+  "success": false,
+  "error": "invalid_ip",
+  "message": "Invalid IP address format: unknown"
 }
 ```
 
@@ -243,10 +252,10 @@ npm run deploy
 
 ## 常见用途
 
-- 🏠 家庭宽带动态 IP 的 DDNS 服务
-- 🖥️ 服务器 IP 变更自动更新
+- 🏠 家庭宽带动态 IP 的 DDNS 服务（支持 IPv4 和 IPv6）
+- 🖥️ 服务器 IP 变更自动更新（A 记录和 AAAA 记录）
 - 📊 网络设备状态监控
-- 🔍 IP 地址查询服务
+- 🔍 IP 地址查询服务（同时支持双栈网络）
 
 ## 技术特点
 
@@ -256,6 +265,7 @@ npm run deploy
 - ⚙️ 完善的错误处理机制
 - 🚀 一键部署到 Cloudflare Workers
 - 📘 TypeScript 支持，类型安全
+- 🌐 IPv4/IPv6 双栈支持，自动识别记录类型
 
 ## License
 
