@@ -1,4 +1,4 @@
-name = "ip"
+name = "cf-ip-ddns-worker"
 main = "src/index.ts"
 compatibility_date = "2024-10-30"
 
