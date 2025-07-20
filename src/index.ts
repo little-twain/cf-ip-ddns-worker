@@ -2,7 +2,7 @@ import type { ExecutionContext } from '@cloudflare/workers-types';
 import { getIPType } from './utils/ip.js';
 import { validateDDNSParams } from './utils/validation.js';
 import { createErrorResponse } from './utils/response.js';
-import { getCacheKey, getCachedIP, setCachedIP, getCacheStats, hasCachedKey } from './services/cache.js';
+import { getCacheKey, getCacheKeyByName, getCachedIP, setCachedIP, getCacheStats, hasCachedKey } from './services/cache.js';
 import { getDNSRecord, updateDNSRecord } from './services/cloudflare.js';
 
 /**
@@ -13,7 +13,7 @@ import { getDNSRecord, updateDNSRecord } from './services/cloudflare.js';
  * 2. GET /?zone=ZONE_ID&email=EMAIL&key=API_KEY&name=RECORD_NAME - Updates DNS record
  *    - Automatically detects IP type and updates A record (IPv4) or AAAA record (IPv6)
  * 3. GET /?stats - Returns cache statistics and monitoring data
- * 4. GET /?info=ZONE_ID+RECORD_NAME - Returns DNS record info and cache status
+ * 4. GET /?info=ZONE_ID+DNS_RECORD_ID - Returns DNS record info and cache status
  */
 
 export default {
@@ -53,25 +53,24 @@ export default {
                 );
             }
 
-            // 解析 zoneID+recordName 格式
+            // 解析 zoneID+dnsRecordID 格式
             const parts = info.split('+');
             if (parts.length !== 2) {
                 return createErrorResponse(
                     "invalid_info_format",
-                    "Info parameter must be in format: zoneID+recordName",
+                    "Info parameter must be in format: zoneID+dnsRecordID",
                     400
                 );
             }
 
-            const [zoneId, recordName] = parts;
+            const [zoneId, recordId] = parts;
             const response: any = {
                 timestamp: new Date().toISOString(),
                 clientIP: clientIP
             };
 
-            // 需要提供临时的认证信息来查询DNS记录，但这里只能查缓存
             // 检查 A 记录缓存状态
-            const aKey = getCacheKey(zoneId, recordName, "A");
+            const aKey = getCacheKey(zoneId, recordId, "A");
             const aCached = await getCachedIP(aKey);
             if (aCached !== null) {
                 response.A = {
@@ -81,7 +80,7 @@ export default {
             }
 
             // 检查 AAAA 记录缓存状态  
-            const aaaaKey = getCacheKey(zoneId, recordName, "AAAA");
+            const aaaaKey = getCacheKey(zoneId, recordId, "AAAA");
             const aaaaCached = await getCachedIP(aaaaKey);
             if (aaaaCached !== null) {
                 response.AAAA = {
@@ -125,20 +124,7 @@ export default {
                 );
             }
 
-            // 生成缓存键
-            const cacheKey = getCacheKey(ddnsParams.zone, ddnsParams.name, ipType);
-
-            // 1) 检查缓存
-            const cachedIP = await getCachedIP(cacheKey);
-            if (cachedIP === clientIP) {
-                // IP 没有变化，直接返回
-                return new Response("", {
-                    status: 200,
-                    headers: { "Content-Type": "text/plain" }
-                });
-            }
-
-            // 2) 获取当前 DNS 记录
+            // 2) 首先获取当前 DNS 记录，以获取记录ID
             const dnsResult = await getDNSRecord(
                 ddnsParams.zone,
                 ddnsParams.name,
@@ -152,7 +138,21 @@ export default {
             }
 
             const record = dnsResult.record;
+            const recordId = record.id;
             const currentIP = record.content;
+
+            // 1) 生成基于记录ID的缓存键
+            const cacheKey = getCacheKey(ddnsParams.zone, recordId, ipType);
+
+            // 检查缓存
+            const cachedIP = await getCachedIP(cacheKey);
+            if (cachedIP === clientIP) {
+                // IP 没有变化，直接返回
+                return new Response("", {
+                    status: 200,
+                    headers: { "Content-Type": "text/plain" }
+                });
+            }
 
             // 如果 DNS 记录中的 IP 和客户端 IP 一致，只需更新缓存
             if (currentIP === clientIP) {
@@ -168,7 +168,7 @@ export default {
             // 3) 更新 DNS 记录
             const updateResult = await updateDNSRecord(
                 ddnsParams.zone,
-                record.id,
+                recordId,
                 ddnsParams.name,
                 ipType,
                 clientIP,

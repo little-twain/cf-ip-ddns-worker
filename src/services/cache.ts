@@ -83,10 +83,17 @@ const cacheTracker = new LRUSetSimple(MAX_CACHE_ENTRIES);
 const cacheStats = new CacheStats();
 
 /**
- * 生成缓存键
+ * 生成缓存键 - 基于哈希值而不是实际域名
  */
-export function getCacheKey(zone: string, recordName: string, recordType: "A" | "AAAA"): string {
-    return `${CACHE_PREFIX}${zone}:${recordName}:${recordType}`;
+export function getCacheKey(zoneId: string, recordId: string, recordType: "A" | "AAAA"): string {
+    return `${CACHE_PREFIX}${zoneId}:${recordId}:${recordType}`;
+}
+
+/**
+ * 生成基于域名的缓存键（仅用于DDNS查询时的临时转换）
+ */
+export function getCacheKeyByName(zoneId: string, recordName: string, recordType: "A" | "AAAA"): string {
+    return `${CACHE_PREFIX}${zoneId}:${recordName}:${recordType}`;
 }
 
 /**

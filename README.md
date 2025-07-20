@@ -88,7 +88,7 @@ curl "https://your-worker.your-subdomain.workers.dev/?stats"
 
 ```bash
 # 查询特定记录的缓存状态
-curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
+curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+DNS_RECORD_ID"
 ```
 
 **响应示例：**
@@ -153,6 +153,26 @@ curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
 - 纯IPv6环境的域名只会返回AAAA记录
 - 双栈环境的域名同时返回A和AAAA记录
 - 如果该域名从未被访问过或缓存已过期，则提示无缓存记录
+
+**获取DNS记录ID：**
+
+DNS记录ID可以通过Cloudflare API获取：
+
+```bash
+# 查询A记录
+curl -X GET "https://api.cloudflare.com/client/v4/zones/ZONE_ID/dns_records?type=A&name=your.domain.com" \
+  -H "X-Auth-Email: your@email.com" \
+  -H "X-Auth-Key: your_api_key" \
+  -H "Content-Type: application/json"
+
+# 查询AAAA记录  
+curl -X GET "https://api.cloudflare.com/client/v4/zones/ZONE_ID/dns_records?type=AAAA&name=your.domain.com" \
+  -H "X-Auth-Email: your@email.com" \
+  -H "X-Auth-Key: your_api_key" \
+  -H "Content-Type: application/json"
+```
+
+响应中的 `result[0].id` 字段即为DNS记录ID。
 
 ### 自动化脚本示例
 
