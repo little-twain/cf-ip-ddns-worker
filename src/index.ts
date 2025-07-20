@@ -54,11 +54,16 @@ export default {
             }
 
             // 解析 zoneID+dnsRecordID 格式
-            const parts = info.split('+');
+            // 注意：URL中的+会被解码为空格，所以我们需要同时支持+和空格
+            let parts = info.split('+');
+            if (parts.length !== 2) {
+                // 如果+分割失败，尝试空格分割（因为URL解码会将+转为空格）
+                parts = info.split(' ');
+            }
             if (parts.length !== 2) {
                 return createErrorResponse(
                     "invalid_info_format",
-                    "Info parameter must be in format: zoneID+dnsRecordID",
+                    "Info parameter must be in format: zoneID+dnsRecordID (use %2B if URL encoding required)",
                     400
                 );
             }
