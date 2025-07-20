@@ -7,3 +7,6 @@ enabled = true
 
 [observability.logs]
 enabled = true
+
+[placement]
+mode = "smart"
