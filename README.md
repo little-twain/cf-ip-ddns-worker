@@ -10,6 +10,8 @@
 - 🔄 **DDNS 更新**：通过 URL 参数自动更新 Cloudflare DNS 记录（A 记录用于 IPv4，AAAA 记录用于 IPv6）
 - ⚡ **快速响应**：基于 Cloudflare Workers 的边缘计算
 - 🤖 **智能记录类型**：根据请求 IP 类型自动选择 A 记录或 AAAA 记录
+- 🗄️ **智能缓存**：内置 LRU 缓存机制，支持高达 70 万条记录，24小时 TTL
+- 📊 **监控功能**：提供缓存统计和 DNS 记录状态查询接口
 
 ## 快速部署
 
@@ -53,8 +55,87 @@ curl https://your-worker.your-subdomain.workers.dev/
 ```bash
 # 用户访问时，自动更新 DNS 记录
 curl "https://your-worker.your-subdomain.workers.dev/?zone=ZONE_ID&email=YOUR_EMAIL&key=YOUR_API_KEY&name=subdomain.example.com"
-
 ```
+
+### 监控和统计
+
+#### 查看缓存统计
+
+```bash
+# 获取缓存性能统计
+curl "https://your-worker.your-subdomain.workers.dev/?stats"
+```
+
+**响应示例：**
+
+```json
+{
+    "timestamp": "2025-01-21T10:30:00.000Z",
+    "clientIP": "1.2.3.4",
+    "statistics": {
+        "sets": 25,
+        "ratio": "1:2"
+    }
+}
+```
+
+**字段说明：**
+
+- `sets`: LRU缓存中当前存储的条目数量
+- `ratio`: 缓存命中与未命中的比例（格式为"命中:未命中"，自动简化为最小整数比）
+
+#### 查询 DNS 记录状态
+
+```bash
+# 查询特定记录的缓存状态
+curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
+```
+
+**响应示例：**
+
+```json
+{
+    "timestamp": "2025-01-21T10:30:00.000Z",
+    "clientIP": "1.2.3.4",
+    "A": {
+        "content": "192.0.2.1",
+        "cached": true
+    }
+}
+```
+
+或当域名同时有A和AAAA记录时：
+
+```json
+{
+    "timestamp": "2025-01-21T10:30:00.000Z",
+    "clientIP": "1.2.3.4",
+    "A": {
+        "content": "192.0.2.1",
+        "cached": true
+    },
+    "AAAA": {
+        "content": "2001:0db8::1",
+        "cached": true
+    }
+}
+```
+
+如果没有缓存记录：
+
+```json
+{
+    "timestamp": "2025-01-21T10:30:00.000Z",
+    "clientIP": "1.2.3.4",
+    "message": "No cached records found for this domain"
+}
+```
+
+**说明：**
+
+- 只返回在缓存中存在的记录类型（A或AAAA）
+- 如果域名既有IPv4又有IPv6解析，则同时返回A和AAAA记录
+- 如果该域名从未被访问过或缓存已过期，则提示无缓存记录
 
 ### 自动化脚本示例
 
@@ -94,10 +175,17 @@ crontab -e
 
 #### 参数说明
 
+**DDNS 更新参数：**
+
 - `zone`: Cloudflare Zone ID
 - `email`: Cloudflare 账户邮箱
 - `key`: Cloudflare Global API Key
 - `name`: 要更新的 DNS 记录名称（如 `home.example.com`）
+
+**监控参数：**
+
+- `stats`: 无值，获取缓存统计信息
+- `info`: 格式为 `zoneID+recordName`，查询 DNS 记录缓存状态
 
 #### 响应行为
 
@@ -138,6 +226,23 @@ crontab -e
 - 建议使用 API Token 替代 Global API Key（需要修改代码中的认证方式）
 - 不要在公开的 URL 中暴露 API Key
 - 考虑添加访问控制或限流机制
+
+## 缓存机制说明
+
+🗄️ **智能缓存系统**：
+
+- **缓存容量**：支持高达 70 万条 DNS 记录缓存
+- **缓存策略**：采用 LRU（最近最少使用）算法管理内存
+- **缓存时间**：24 小时 TTL，自动过期清理
+- **性能优化**：显著减少 Cloudflare API 调用次数
+- **命中统计**：实时跟踪缓存命中率和性能指标
+
+**缓存工作原理**：
+
+1. 首次 DDNS 更新时，IP 地址被缓存 24 小时
+2. 后续相同 IP 的请求直接返回，无需 API 调用
+3. IP 变化时自动更新 DNS 记录并刷新缓存
+4. 超出容量时自动清理最旧的缓存条目
 
 ## License
 

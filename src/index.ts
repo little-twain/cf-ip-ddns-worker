@@ -69,21 +69,31 @@ export default {
                 clientIP: clientIP
             };
 
+            // 需要提供临时的认证信息来查询DNS记录，但这里只能查缓存
             // 检查 A 记录缓存状态
             const aKey = getCacheKey(zoneId, recordName, "A");
             const aCached = await getCachedIP(aKey);
-            response.A = {
-                content: aCached || null,
-                cached: aCached !== null
-            };
+            if (aCached !== null) {
+                response.A = {
+                    content: aCached,
+                    cached: true
+                };
+            }
 
             // 检查 AAAA 记录缓存状态  
             const aaaaKey = getCacheKey(zoneId, recordName, "AAAA");
             const aaaaCached = await getCachedIP(aaaaKey);
-            response.AAAA = {
-                content: aaaaCached || null,
-                cached: aaaaCached !== null
-            };
+            if (aaaaCached !== null) {
+                response.AAAA = {
+                    content: aaaaCached,
+                    cached: true
+                };
+            }
+
+            // 如果没有任何缓存记录，返回提示信息
+            if (!response.A && !response.AAAA) {
+                response.message = "No cached records found for this domain";
+            }
 
             return new Response(JSON.stringify(response, null, 2), {
                 headers: { "Content-Type": "application/json" },
