@@ -81,7 +81,7 @@ curl "https://your-worker.your-subdomain.workers.dev/?stats"
 
 **字段说明：**
 
-- `sets`: LRU缓存中当前存储的条目数量
+- `sets`: 缓存中当前存储的条目数量
 - `ratio`: 缓存命中与未命中的比例（格式为"命中:未命中"，自动简化为最小整数比）
 
 #### 查询 DNS 记录状态
@@ -92,6 +92,8 @@ curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
 ```
 
 **响应示例：**
+
+仅有A记录缓存时：
 
 ```json
 {
@@ -104,7 +106,20 @@ curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
 }
 ```
 
-或当域名同时有A和AAAA记录时：
+仅有AAAA记录缓存时：
+
+```json
+{
+    "timestamp": "2025-01-21T10:30:00.000Z",
+    "clientIP": "2001:0db8::1",
+    "AAAA": {
+        "content": "2001:0db8::1",
+        "cached": true
+    }
+}
+```
+
+当域名同时有A和AAAA记录缓存时：
 
 ```json
 {
@@ -133,8 +148,10 @@ curl "https://your-worker.your-subdomain.workers.dev/?info=ZONE_ID+RECORD_NAME"
 
 **说明：**
 
-- 只返回在缓存中存在的记录类型（A或AAAA）
-- 如果域名既有IPv4又有IPv6解析，则同时返回A和AAAA记录
+- 只返回在缓存中实际存在的记录类型（A、AAAA或两者）
+- 纯IPv4环境的域名只会返回A记录
+- 纯IPv6环境的域名只会返回AAAA记录
+- 双栈环境的域名同时返回A和AAAA记录
 - 如果该域名从未被访问过或缓存已过期，则提示无缓存记录
 
 ### 自动化脚本示例
@@ -231,8 +248,8 @@ crontab -e
 
 🗄️ **智能缓存系统**：
 
-- **缓存容量**：支持高达 70 万条 DNS 记录缓存
-- **缓存策略**：采用 LRU（最近最少使用）算法管理内存
+- **缓存容量**：支持 70 万条 DNS 记录缓存
+- **缓存策略**：采用 LRU 算法管理内存
 - **缓存时间**：24 小时 TTL，自动过期清理
 - **性能优化**：显著减少 Cloudflare API 调用次数
 - **命中统计**：实时跟踪缓存命中率和性能指标
