@@ -1,6 +1,46 @@
 import { CACHE_PREFIX, MAX_CACHE_ENTRIES, CACHE_TTL } from '../constants/index.js';
 
 /**
+ * 缓存统计数据
+ */
+class CacheStats {
+    private hits = 0;
+    private misses = 0;
+
+    recordHit() {
+        this.hits++;
+    }
+
+    recordMiss() {
+        this.misses++;
+    }
+
+    getStats() {
+        if (this.hits === 0 && this.misses === 0) {
+            return { hits: 0, misses: 0, ratio: "0:0" };
+        }
+
+        // 计算最简比例
+        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+        const divisor = gcd(this.hits, this.misses);
+        
+        const hitRatio = this.hits / divisor;
+        const missRatio = this.misses / divisor;
+
+        return {
+            hits: this.hits,
+            misses: this.misses,
+            ratio: `${hitRatio}:${missRatio}`
+        };
+    }
+
+    reset() {
+        this.hits = 0;
+        this.misses = 0;
+    }
+}
+
+/**
  * 简化的 LRU Set 实现，用于管理缓存键的生命周期
  */
 class LRUSetSimple {
@@ -32,10 +72,15 @@ class LRUSetSimple {
     delete(key: string) {
         return this.set.delete(key);
     }
+
+    size() {
+        return this.set.size;
+    }
 }
 
-// 全局 LRU Set 实例
+// 全局实例
 const cacheTracker = new LRUSetSimple(MAX_CACHE_ENTRIES);
+const cacheStats = new CacheStats();
 
 /**
  * 生成缓存键
@@ -53,12 +98,30 @@ export async function getCachedIP(cacheKey: string): Promise<string | null> {
         const cachedResponse = await cache.match(new Request(`https://dummy.com/${cacheKey}`));
         if (cachedResponse) {
             const cachedData = await cachedResponse.text();
+            cacheStats.recordHit();
             return cachedData;
+        } else {
+            cacheStats.recordMiss();
         }
     } catch (error) {
         console.warn('Cache read error:', error);
+        cacheStats.recordMiss();
     }
     return null;
+}
+
+/**
+ * 检查缓存中是否存在指定键（用于监控）
+ */
+export async function hasCachedKey(cacheKey: string): Promise<boolean> {
+    try {
+        const cache = caches.default;
+        const cachedResponse = await cache.match(new Request(`https://dummy.com/${cacheKey}`));
+        return cachedResponse !== undefined;
+    } catch (error) {
+        console.warn('Cache check error:', error);
+        return false;
+    }
 }
 
 /**
@@ -86,4 +149,24 @@ export async function setCachedIP(cacheKey: string, ip: string): Promise<void> {
     } catch (error) {
         console.warn('Cache write error:', error);
     }
+}
+
+/**
+ * 获取缓存统计信息
+ */
+export function getCacheStats() {
+    const stats = cacheStats.getStats();
+    return {
+        sets: cacheTracker.size(),
+        ratio: stats.ratio,
+        totalHits: stats.hits,
+        totalMisses: stats.misses
+    };
+}
+
+/**
+ * 重置缓存统计信息
+ */
+export function resetCacheStats() {
+    cacheStats.reset();
 }

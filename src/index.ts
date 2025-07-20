@@ -2,7 +2,7 @@ import type { ExecutionContext } from '@cloudflare/workers-types';
 import { getIPType } from './utils/ip.js';
 import { validateDDNSParams } from './utils/validation.js';
 import { createErrorResponse } from './utils/response.js';
-import { getCacheKey, getCachedIP, setCachedIP } from './services/cache.js';
+import { getCacheKey, getCachedIP, setCachedIP, getCacheStats, hasCachedKey } from './services/cache.js';
 import { getDNSRecord, updateDNSRecord } from './services/cloudflare.js';
 
 /**
@@ -12,6 +12,8 @@ import { getDNSRecord, updateDNSRecord } from './services/cloudflare.js';
  * 1. GET /<any-path> - Returns visitor's IP address (IPv4 or IPv6)
  * 2. GET /?zone=ZONE_ID&email=EMAIL&key=API_KEY&name=RECORD_NAME - Updates DNS record
  *    - Automatically detects IP type and updates A record (IPv4) or AAAA record (IPv6)
+ * 3. GET /?stats - Returns cache statistics and monitoring data
+ * 4. GET /?info=ZONE_ID+RECORD_NAME - Returns DNS record info and cache status
  */
 
 export default {
@@ -23,6 +25,70 @@ export default {
         const url = new URL(request.url);
         const params = url.searchParams;
         const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
+
+        // 统计端点
+        if (params.has("stats")) {
+            const stats = getCacheStats();
+            const response = {
+                timestamp: new Date().toISOString(),
+                clientIP: clientIP,
+                statistics: {
+                    sets: stats.sets,
+                    ratio: stats.ratio
+                }
+            };
+            return new Response(JSON.stringify(response, null, 2), {
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+
+        // 信息查询端点
+        if (params.has("info")) {
+            const info = params.get("info");
+            if (!info) {
+                return createErrorResponse(
+                    "missing_info",
+                    "Info parameter is required",
+                    400
+                );
+            }
+
+            // 解析 zoneID+recordName 格式
+            const parts = info.split('+');
+            if (parts.length !== 2) {
+                return createErrorResponse(
+                    "invalid_info_format",
+                    "Info parameter must be in format: zoneID+recordName",
+                    400
+                );
+            }
+
+            const [zoneId, recordName] = parts;
+            const response: any = {
+                timestamp: new Date().toISOString(),
+                clientIP: clientIP
+            };
+
+            // 检查 A 记录缓存状态
+            const aKey = getCacheKey(zoneId, recordName, "A");
+            const aCached = await getCachedIP(aKey);
+            response.A = {
+                content: aCached || null,
+                cached: aCached !== null
+            };
+
+            // 检查 AAAA 记录缓存状态  
+            const aaaaKey = getCacheKey(zoneId, recordName, "AAAA");
+            const aaaaCached = await getCachedIP(aaaaKey);
+            response.AAAA = {
+                content: aaaaCached || null,
+                cached: aaaaCached !== null
+            };
+
+            return new Response(JSON.stringify(response, null, 2), {
+                headers: { "Content-Type": "application/json" },
+            });
+        }
 
         // 如果 URL 上带齐四个参数，就走 DDNS 更新流程
         if (
