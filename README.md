@@ -1,6 +1,8 @@
 # Cloudflare Worker DDNS
 
-高性能的 Cloudflare Worker，提供IP检测和DDNS自动更新功能，具备智能缓存和监控能力。
+🌐 高性能的 Cloudflare Worker，提供IP检测和DDNS自动更新功能，具备智能缓存和监控能力。
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/little-twain/cf-ip-ddns-worker)
 
 ## 功能特性
 
@@ -8,7 +10,6 @@
 - 🔄 **DDNS更新**：自动更新Cloudflare DNS记录（使用官方SDK）
 - 🚀 **极致缓存**：三层LRU缓存架构，开放寻址哈希表
 - 📊 **实时监控**：提供缓存统计和域名信息查询
-- ⚡ **强大性能**：O(1)查找，FNV-1a哈希，紧密内存布局
 - 🛡️ **类型安全**：使用官方Cloudflare Node.js SDK
 
 ## 使用方法
