@@ -1,7 +1,7 @@
 {
     "name": "cf-ip-ddns-worker",
     "version": "1.0.0",
-    "description": "Simple Cloudflare Worker to return visitor IP and optionally update A record via Cloudflare API",
+    "description": "High-performance Cloudflare Worker for IP detection and DDNS auto-updates with smart caching and monitoring",
     "main": "src/index.ts",
     "scripts": {
         "dev": "wrangler dev",
@@ -30,5 +30,8 @@
         "@cloudflare/workers-types": "^4.20250718.0",
         "typescript": "^5.8.3",
         "wrangler": "^4.25.0"
+    },
+    "dependencies": {
+        "cloudflare": "^4.5.0"
     }
 }
